@@ -48,7 +48,7 @@ while true; do
         --clear \
         --cancel-label "Exit" \
         --scrollbar \
-        --menu "Choose action:" $_HEIGHT $_WIDTH 10 \
+        --menu "(${CONDA_DEFAULT_ENV}) Choose action:" $_HEIGHT $_WIDTH 10 \
         "activate"   "$ conda activate [NAME]" \
         "deactivate" "$ conda deactivate" \
         "env list"   "$ conda env list" \
