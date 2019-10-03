@@ -1,0 +1,220 @@
+#!/bin/echo Please run (from a Bourne-like shell): .
+# put an alias into ~/.bashrc or ~/.bash_aliases
+#     alias condamenu='. /PATH/TO/condamenu'
+
+_DIALOG_OK=0
+_DIALOG_CANCEL=1
+_DIALOG_ESC=255
+_HEIGHT=0
+_WIDTH=0
+
+show_errormsg_inputname() {
+    dialog \
+        --title "$1" \
+        --no-collapse \
+        --msgbox "ERROR\n  Please input the name of new environment." \
+        7 61
+}
+
+select_environment() {
+    _conda_base=$(conda info --base)
+    _conda_envs=$(ls ${_conda_base}/envs)
+    _result=$(dialog \
+                 --title "$1" \
+                 --clear \
+                 --no-collapse \
+                 --scrollbar \
+                 --no-items \
+                 --menu "Select environment:" $_HEIGHT $_WIDTH 6 \
+                 ${_conda_envs} \
+                 3>&1 1>&2 2>&3)
+    _exit_status=$?
+}
+
+input_name() {
+    _result=$(dialog \
+                 --title "$1" \
+                 --clear \
+                 --no-collapse \
+                 --inputbox "Enter the name of conda environment. \n  \$ conda create --name [ENVNAME] $2" \
+                 7 61 \
+                 3>&1 1>&2 2>&3)
+    _exit_status=$?
+}
+
+while true; do
+    _selection=$(dialog \
+        --title "conda ..." \
+        --clear \
+        --cancel-label "Exit" \
+        --scrollbar \
+        --menu "Choose action:" $_HEIGHT $_WIDTH 10 \
+        "activate"   "$ conda activate [NAME]" \
+        "deactivate" "$ conda deactivate" \
+        "env list"   "$ conda env list" \
+        "create 3.6" "$ conda create --name [NAME] python=3.6" \
+        "create 3.7" "$ conda create --name [NAME] python=3.7" \
+        "clone"      "$ conda create --name [NEWNAME] --clone [OLDNAME]" \
+        "remove"     "$ conda remove --name [NAME] --all" \
+        "config"     "$ conda config ..." \
+        "quit"       "quit this program" \
+        3>&1 1>&2 2>&3)
+    _exit_status=$?
+    case $_exit_status in
+        $_DIALOG_CANCEL|$_DIALOG_ESC)
+            clear
+            break
+            ;;
+    esac
+    case $_selection in
+        'activate' )
+            select_environment "conda activate ..."
+            case $_exit_status in
+                $_DIALOG_OK)
+                    clear
+                    conda activate $_result
+                    break
+                    ;;
+            esac
+            ;;
+        'deactivate' )
+            if [ "$CONDA_DEFAULT_ENV" = "base" ]; then
+                dialog --title "conda deactivate" \
+                    --no-collapse \
+                    --msgbox "ABORTED\n  Please activate before deactivate." 7 51
+            else
+                clear
+                conda deactivate
+                break
+            fi
+            ;;
+        'env list' )
+            clear
+            echo "Please wait for a moment..."
+            conda env list | less
+            ;;
+        'create 3.6' )
+            input_name "conda create ..." "python=3.6"
+            case $_exit_status in
+                $_DIALOG_OK)
+                    if [ -n "$_result" ]; then
+                        clear
+                        echo conda create --name ""$_result"" ""python=3.6""
+                        conda create --name "$_result" "python=3.6"
+                        break
+                    else
+                        show_errormsg_inputname "conda create ..."
+                    fi
+                    ;;
+            esac
+            ;;
+        'create 3.7' )
+            input_name "conda create ..." "python=3.7"
+            case $_exit_status in
+                $_DIALOG_OK)
+                    if [ -n "$_result" ]; then
+                        clear
+                        echo conda create --name ""$_result"" ""python=3.7""
+                        conda create --name "$_result" "python=3.7"
+                        break
+                    else
+                        show_errormsg_inputname "conda create ..."
+                    fi
+                    ;;
+            esac
+            ;;
+        'clone' )
+            input_name "conda create ... for clone" "--clone ..."
+            case $_exit_status in
+                $_DIALOG_OK)
+                    if [ -n "$_result" ]; then
+                        _name=$_result
+                        select_environment "conda create --name $_name for clone"
+                        case $_exit_status in
+                            $_DIALOG_OK)
+                                if [ -n "$_result" ]; then
+                                    clear
+                                    echo conda create --name ""$_name"" --clone ""$_result""
+                                    conda create --name "$_name" --clone "$_result"
+                                    break
+                                else
+                                    show_errormsg_inputname "conda create ... for clone"
+                                fi
+                                ;;
+                            $_DIALOG_CANCEL|$_DIALOG_ESC)
+                                ;;
+                        esac
+                    else
+                        show_errormsg_inputname "conda create ... for clone"
+                    fi
+                    ;;
+            esac
+            ;;
+        'remove' )
+            if [ "$CONDA_DEFAULT_ENV" != "base" ]; then
+                dialog \
+                    --title "conda remove ..." \
+                    --no-collapse \
+                    --msgbox "ABORTED\n  Please deactivate into base before removing." 7 51
+            else
+                select_environment "conda remove ..."
+                case $_exit_status in
+                    $_DIALOG_OK)
+                        clear
+                        echo conda remove --name ""$_result"" --all
+                        conda remove --name "$_result" --all
+                        break
+                        ;;
+                esac
+            fi
+            ;;
+        'config' )
+            while true; do
+                _selection=$(dialog \
+                    --title "conda config ..." \
+                    --no-collapse \
+                    --clear \
+                    --menu "Chose action:" $HEIGHT $WIDTH 7 \
+                    "1" "conda config --get channel_priority" \
+                    "2" "conda config --set channel_priority strict   [recommended]" \
+                    "3" "conda config --set channel_priority flexible [default]" \
+                    "-" "-------------------------------------------------------------" \
+                    "4" "conda config --get channels" \
+                    "5" "conda config --add channels conda-forge      [recommended]" \
+                    "6" "conda config --remove channels conda-forge" \
+                    3>&1 1>&2 2>&3)
+                _exit_status=$?
+                case $_exit_status in
+                    $_DIALOG_CANCEL|$_DIALOG_ESC)
+                        clear
+                        break
+                       ;;
+                esac
+                case $_selection in
+                    '1' )
+                        conda config --get channel_priority | less
+                        ;;
+                    '2' )
+                        conda config --get channels | less
+                        ;;
+                    '3' )
+                        conda config --set channel_priority strict
+                        ;;
+                    '4' )
+                        conda config --set channel_priority flexible
+                        ;;
+                    '5' )
+                        conda config --add channels conda-forge
+                        ;;
+                    '6' )
+                        conda config --remove channels conda-forge
+                        ;;
+                esac
+            done
+            ;;
+        'quit' )
+            clear
+            break
+            ;;
+    esac
+done
